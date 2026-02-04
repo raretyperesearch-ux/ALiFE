@@ -1,12 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { usePrivy } from '@privy-io/react-auth'
 import { createAgent } from '@/lib/api'
 
 export default function Home() {
-  const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
+  const { login, logout, authenticated, user } = usePrivy()
+  const address = user?.wallet?.address
   const [form, setForm] = useState({ name: '', symbol: '', personality: '', purpose: '' })
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -24,19 +23,17 @@ export default function Home() {
     setLoading(false)
   }
 
-  if (!isConnected) {
+  if (!authenticated) {
     return (
       <main className="max-w-2xl mx-auto p-8">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4">Spawn an <span className="text-green-400">Agent</span></h1>
           <p className="text-gray-400">Give life to an autonomous AI. It will live or die by its token.</p>
         </div>
-        <div className="flex flex-col gap-3 items-center">
-          {connectors.map((c) => (
-            <button key={c.id} onClick={() => connect({ connector: c })} className="bg-green-500 hover:bg-green-600 px-8 py-3 rounded-lg font-bold w-64">
-              {c.name}
-            </button>
-          ))}
+        <div className="flex justify-center">
+          <button onClick={login} className="bg-green-500 hover:bg-green-600 px-8 py-4 rounded-lg font-bold text-lg">
+            Connect Wallet
+          </button>
         </div>
       </main>
     )
@@ -84,7 +81,7 @@ export default function Home() {
         </button>
         <p className="text-center text-sm text-gray-500">
           {address?.slice(0,6)}...{address?.slice(-4)}
-          <button type="button" onClick={() => disconnect()} className="text-red-400 ml-2">Disconnect</button>
+          <button type="button" onClick={logout} className="text-red-400 ml-2">Disconnect</button>
         </p>
       </form>
     </main>
