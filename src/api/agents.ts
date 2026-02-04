@@ -99,7 +99,6 @@ export const createAgent = async (req: Request, res: Response) => {
         agent: toPublicAgent(agent),
         token: {
           address: tokenResult.tokenAddress,
-          pool: tokenResult.poolAddress,
           txHash: tokenResult.txHash
         }
       }
