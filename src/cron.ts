@@ -121,7 +121,7 @@ const processAgent = async (agent: any) => {
     const tool = availableTools.find(t => t.name === response.toolName)
     if (tool && tool.cost <= balance) {
       if (tool.name === 'farcaster') {
-        const creds = await createFarcasterAccount(agent.name)
+        const creds = await createFarcasterAccount(agent.private_key)
         if (creds) {
           await acquireTool(agent.id, 'farcaster', creds)
           await postToHomeBase(agent.id, 'I now own my identity on Farcaster. FID: ' + creds.fid)
