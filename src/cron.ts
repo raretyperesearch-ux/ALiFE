@@ -3,7 +3,7 @@ import { supabase } from './lib/supabase'
 import { getBalanceUsd } from './services/wallet'
 import { askAgent } from './services/openrouter'
 import { hasFarcaster, getAgentCasts, postCast, createFarcasterAccount } from './services/farcaster'
-import { getAvailableTools, getAgentTools, acquireTool, postBounty } from './services/tools'
+import { getAvailableTools, acquireTool, postBounty } from './services/tools'
 
 const ACTIVATION_THRESHOLD = 10
 
@@ -50,6 +50,7 @@ const processAgent = async (agent: any) => {
   const balance = await getBalanceUsd(walletAddress)
   console.log(`[${agent.name}] Balance: $${balance.toFixed(2)}`)
 
+  // Death check
   if (balance < 0.01) {
     console.log(`[${agent.name}] DIED!`)
     await supabase
@@ -60,7 +61,7 @@ const processAgent = async (agent: any) => {
     return
   }
 
-  // Get abilities and available tools
+  // Get abilities
   const { data: abilities } = await supabase
     .from('abilities')
     .select('name, config')
@@ -74,7 +75,7 @@ const processAgent = async (agent: any) => {
   // Check Farcaster
   const fcCreds = hasFarcaster(abilities || [])
   
-  // Get memory
+  // Get recent posts
   let recentPosts: string[] = []
   if (fcCreds) {
     recentPosts = await getAgentCasts(fcCreds.fid, 5)
@@ -96,7 +97,7 @@ const processAgent = async (agent: any) => {
     .order('created_at', { ascending: false })
     .limit(10)
 
-  // Ask agent
+  // Ask agent what to do
   const response = await askAgent({
     name: agent.name,
     personality: agent.personality,
@@ -111,7 +112,7 @@ const processAgent = async (agent: any) => {
 
   console.log(`[${agent.name}] Action: ${response.action} - ${response.reasoning}`)
 
-  // Handle POST
+  // POST
   if (response.action === 'post' && response.message) {
     if (fcCreds) {
       const hash = await postCast(fcCreds.signerUuid, response.message)
@@ -125,43 +126,42 @@ const processAgent = async (agent: any) => {
     }
   }
 
-  // Handle ACQUIRE_TOOL
+  // ACQUIRE TOOL
   if (response.action === 'acquire_tool' && response.toolName) {
     const tool = availableTools.find(t => t.name === response.toolName)
     if (tool && tool.cost <= balance) {
       console.log(`[${agent.name}] Acquiring ${tool.name}...`)
       
-      if (tool.name === 'farcaster' && tool.automated) {
+      if (tool.name === 'farcaster') {
         const creds = await createFarcasterAccount(agent.name)
         if (creds) {
           await acquireTool(agent.id, 'farcaster', creds)
-          await postToHomeBase(agent.id, `🎉 I now have Farcaster! FID: ${creds.fid}`)
+          await postToHomeBase(agent.id, `🎉 Got Farcaster! FID: ${creds.fid}`)
           console.log(`[${agent.name}] Got Farcaster! FID: ${creds.fid}`)
         }
       } else if (tool.automated) {
         await acquireTool(agent.id, tool.name, {})
-        await postToHomeBase(agent.id, `🔧 Acquired new ability: ${tool.name}`)
+        await postToHomeBase(agent.id, `🔧 Acquired: ${tool.name}`)
         console.log(`[${agent.name}] Acquired ${tool.name}`)
       } else {
-        // Non-automated tool - post a bounty
         const bountyId = await postBounty(
           agent.id,
           `Need ${tool.name} setup`,
-          `I want to acquire ${tool.name}: ${tool.description}`,
+          `I want ${tool.name}: ${tool.description}`,
           tool.cost
         )
         if (bountyId) {
-          await postToHomeBase(agent.id, `📋 Posted bounty for ${tool.name} ($${tool.cost})`)
+          await postToHomeBase(agent.id, `📋 Bounty posted for ${tool.name}`)
           console.log(`[${agent.name}] Posted bounty for ${tool.name}`)
         }
       }
     }
   }
 
-  // Handle POST_BOUNTY
-  if (response.action === 'post_bounty' && respounty) {
+  // POST BOUNTY
+  if (response.action === 'post_bounty' && response.bounty) {
     const { title, description, reward } = response.bounty
-    if (reward <= balance && reward > 0) {
+    if (reward <= balance &&d > 0) {
       const bountyId = await postBounty(agent.id, title, description, reward)
       if (bountyId) {
         await postToHomeBase(agent.id, `📋 Bounty: "${title}" - $${reward}`)
@@ -180,7 +180,7 @@ const processAgent = async (agent: any) => {
     console.log(`[${agent.name}] Remembered: "${response.memory.slice(0, 50)}..."`)
   }
 
-  // Update
+  // Update agent
   await supabase
     .from('agents')
     .update({ last_active: new Date().toISOString(), balance_usd: balance })
@@ -196,12 +196,12 @@ const postToHomeBase = async (agentId: string, content: string) => {
 }
 
 const checkEmbryos = async () => {
-  const { data: embryos } = ait supabase
+  const { data: embryos } = await supabase
     .from('agents')
     .select('*')
     .eq('status', 'embryo')
 
-  console.log(`Checking ${embryos?.length || 0} embryos for activation...`)
+  console.log(`ecking ${embryos?.length || 0} embryos for activation...`)
 
   for (const embryo of embryos || []) {
     try {
