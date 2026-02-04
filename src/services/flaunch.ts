@@ -41,14 +41,9 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   const flaunch = createFlaunch({ publicClient, walletClient }) as any
 
-  const hash = await flaunch.flaunchIPFSWithSplitManager({
+  const hash = await flaunch.flaunchWithSplitManager({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
-    metadata: {
-      image: `https://placehold.co/400x400/1a1a2e/00ff88/png?text=${params.symbol.slice(0, 4)}`,
-      description: params.description || `ALiFe Agent - ${params.name}`,
-      websiteUrl: 'https://alife.xyz',
-    },
     fairLaunchPercent: 0,
     fairLaunchDuration: 30 * 60,
     initialMarketCapUSD: 5000,
