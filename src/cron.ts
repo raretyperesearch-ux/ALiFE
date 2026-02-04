@@ -2,7 +2,7 @@ import cron from 'node-cron'
 import { supabase } from './lib/supabase'
 import { getBalanceUsd } from './services/wallet'
 import { askAgent } from './services/openrouter'
-import { hasFarcaster, getAgentCasts, postCast, createFarcasterAccount } from './services/farcaster'
+import { hasFarcaster, getAgentCasts } from './services/farcaster'
 
 const ACTIVATION_THRESHOLD = 10
 
@@ -40,7 +40,14 @@ const processAliveAgents = async () => {
 const processAgent = async (agent: any) => {
   console.log(`\n[${agent.name}] Processing...`)
 
-  const balance = await getBalanceUsd(agent.walletAddress)
+  // Use snake_case from Supabase
+  const walletAddress = agent.wallet_address
+  if (!walletAddress) {
+    console.error(`[${agent.name}] No wallet address!`)
+    return
+  }
+
+  const balance = await getBalanceUsd(walletAddress)
   console.log(`[${agent.name}] Balance: $${balance.toFixed(2)}`)
 
   // Check for death
@@ -48,7 +55,7 @@ const processAgent = async (agent: any) => {
     console.log(`[${agent.name}] DIED! Balance too low.`)
     await supabase
       .from('agents')
-      .update({ status: 'dead', diedAt: new Date().toISOString() })
+      .update({ status: 'dead', died_at: new Date().toISOString() })
       .eq('id', agent.id)
     
     await postToHomeBase(agent.id, "My treasury is empty. This is the end. Goodbye.")
@@ -67,11 +74,10 @@ const processAgent = async (agent: any) => {
   // Check Farcaster
   const fcCreds = hasFarcaster(abilities || [])
   
-  // Get memory: either from Farcaster or local DB
+  // Get memory from recent posts
   let recentPosts: string[] = []
   if (fcCreds) {
     recentPosts = await getAgentCasts(fcCreds.fid, 5)
-    console.log(`[${agent.name}] Loaded ${recentPosts.length} casts from Farcaster`)
   } else {
     const { data: msgs } = await supabase
       .from('messages')
@@ -106,31 +112,8 @@ const processAgent = async (agent: any) => {
 
   // Execute action
   if (response.action === 'post' && response.message) {
-    if (fcCreds) {
-      // Post to Farcaster
-      const hash = await postCast(agent.privateKey, fcCreds, response.message)
-      if (hash) {
-        console.log(`[${agent.name}] Posted to Farcaster: ${hash}`)
-      }
-    } else {
-      // Post to home base
-      await postToHomeBase(agent.id, response.message)
-      console.log(`[${agent.name}] Posted to Home Base: "${response.message.slice(0, 50)}..."`)
-    }
-  }
-
-  // Handle get_farcaster action
-  if (response.action === 'get_farcaster' && balance >= 2) {
-    console.log(`[${agent.name}] Attempting to create Farcaster account...`)
-    const creds = await createFarcasterAccount(agent.privateKey, agent.name)
-    if (creds) {
-      await supabase.from('abilities').insert({
-        agent_id: agent.id,
-        name: 'farcaster',
-        config: creds
-      })
-      console.log(`[${agent.name}] Got Farcaster! FID: ${creds.fid}`)
-    }
+    await postToHomeBase(agent.id, response.message)
+    console.log(`[${agent.name}] Posted: "${response.message.slice(0, 50)}..."`)
   }
 
   // Save memory
@@ -146,7 +129,7 @@ const processAgent = async (agent: any) => {
   // Update last active
   await supabase
     .from('agents')
-    .update({ lastActive: new Date().toISOString(), balanceUsd: balance })
+    .update({ last_active: new Date().toISOString(), balance_usd: balance })
     .eq('id', agent.id)
 }
 
@@ -168,18 +151,21 @@ const checkEmbryos = async () => {
 
   for (const embryo of embryos || []) {
     try {
-      const balance = await getBalanceUsd(embryo.walletAddress)
+      const walletAddress = embryo.wallet_address
+      if (!walletAddress) continue
+
+      const balance = await getBalanceUsd(walletAddress)
       console.log(`[${embryo.name}] Embryo balance: $${balance.toFixed(2)}`)
 
       if (balance >= ACTIVATION_THRESHOLD) {
-        console.log(`[${embryo.name}] ACTIVATING! Balance: $${balance.toFixed(2)}`)
+        console.log(`[${embryo.name}] ACTIVATING!`)
         
         await supabase
           .from('agents')
           .update({ 
             status: 'alive', 
-            bornAt: new Date().toISOString(),
-            balanceUsd: balance 
+            born_at: new Date().toISOString(),
+            balance_usd: balance 
           })
           .eq('id', embryo.id)
 
@@ -208,7 +194,7 @@ const checkEmbryos = async () => {
 
         if (response.message) {
           await postToHomeBase(embryo.id, response.message)
-          console.log(`[${embryo.name}] Is now ALIVE! First words: "${response.message}"`)
+          console.log(`[${embryo.name}] ALIVE! First words: "${response.message}"`)
         }
       }
     } catch (error) {
