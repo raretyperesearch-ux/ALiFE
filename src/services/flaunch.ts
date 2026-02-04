@@ -18,14 +18,8 @@ interface FlaunchDeployResult {
   txHash: string
 }
 
-// Generate a simple SVG as base64
-const generateBase64Image = (symbol: string): string => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
-    <rect width="400" height="400" fill="#1a1a2e"/>
-    <text x="200" y="200" font-family="Arial" font-size="80" fill="#00ff88" text-anchor="middle" dominant-baseline="middle">${symbol.slice(0, 4)}</text>
-  </svg>`
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
-}
+// Minimal 1x1 green PNG as base64
+const PLACEHOLDER_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAGQCAIAAAAP3aGbAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6QIEBwMwN5l6UAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAARklEQVR42u3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAN1+AABVhDU0QAAAABJRU5ErkJggg=='
 
 export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchDeployResult> => {
   const privateKey = process.env.PLATFORM_PRIVATE_KEY as `0x${string}`
@@ -51,11 +45,10 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   // Generate tokenUri via Flaunch API
   console.log('Uploading image to Flaunch API...')
-  const base64Image = generateBase64Image(params.symbol)
   
   const imageRes = await axios.post(
     'https://web2-api.flaunch.gg/api/v1/upload-image',
-    { base64Image },
+    { base64Image: PLACEHOLDER_PNG },
     { headers: { 'Content-Type': 'application/json' } }
   )
   const imageHash = imageRes.data.ipfsHash
