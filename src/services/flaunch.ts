@@ -44,15 +44,15 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
   const hash = await flaunch.flaunchWithSplitManager({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
-    fairLaunchPercent: 0,
-    fairLaunchDuration: 30 * 60,
-    initialMarketCapUSD: 5000,
+    fairLaunchPercent: BigInt(0),
+    fairLaunchDuration: BigInt(30 * 60),
+    initialMarketCapUSD: BigInt(5000),
     creator: params.platformWallet as `0x${string}`,
-    creatorFeeAllocationPercent: 100,
-    creatorSplitPercent: 50,
+    creatorFeeAllocationPercent: BigInt(100),
+    creatorSplitPercent: BigInt(50),
     splitReceivers: [
-      { address: params.devWallet as `0x${string}`, percent: 50 },
-      { address: params.agentWallet as `0x${string}`, percent: 50 },
+      { address: params.devWallet as `0x${string}`, percent: BigInt(50) },
+      { address: params.agentWallet as `0x${string}`, percent: BigInt(50) },
     ],
   })
 
