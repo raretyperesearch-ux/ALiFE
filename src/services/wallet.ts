@@ -65,7 +65,7 @@ export const getEthPrice = async (): Promise<number> => {
     const response = await fetch(
       'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
     );
-    const data = await response.json();
+    const data: any = await response.json();
     const price = data.ethereum.usd;
     
     // Update cache

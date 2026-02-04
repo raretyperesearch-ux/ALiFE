@@ -88,7 +88,7 @@ Respond ONLY with valid JSON in this exact format:
     throw new Error('OpenRouter API call failed');
   }
 
-  const data = await response.json();
+  const data: any = await response.json();
   const text = data.choices[0]?.message?.content || '';
 
   // Parse JSON from response
@@ -173,7 +173,7 @@ Respond with ONLY the message, no quotes or explanation.`;
     return `I'm alive. Treasury: $${balanceUsd.toFixed(0)}. Let's see how long I survive.`;
   }
 
-  const data = await response.json();
+  const data: any = await response.json();
   return data.choices[0]?.message?.content?.trim() || 
     `I'm alive. Treasury: $${balanceUsd.toFixed(0)}. Let's see how long I survive.`;
 };
