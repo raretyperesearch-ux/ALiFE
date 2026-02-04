@@ -6,7 +6,7 @@ import { Agent, AgentDecision, Message } from './types';
 import { ethers } from 'ethers';
 
 // Activation threshold in USD
-const ACTIVATION_THRESHOLD = 500;
+const ACTIVATION_THRESHOLD = 10;
 
 // Death threshold in USD
 const DEATH_THRESHOLD = 1;
