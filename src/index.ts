@@ -1,12 +1,12 @@
 import express from 'express'
 import cors from 'cors'
-import { agentRoutes } from './routes/agents'
+import { router } from './routes'
 import { startAgentLoop } from './cron'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
-app.use('/api', agentRoutes)
+app.use('/api', router)
 
 const PORT = process.env.PORT || 3001
 
