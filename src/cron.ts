@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { supabase } from './db/supabase'
+import { supabase } from './lib/supabase'
 import { getBalanceUsd } from './services/wallet'
 import { askAgent } from './services/openrouter'
 
