@@ -13,7 +13,6 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!address) return alert('Connect wallet first')
-    
     setLoading(true)
     try {
       const res = await createAgent({ ...form, deployerAddress: address })
@@ -30,11 +29,8 @@ export default function Home() {
         <h1 className="text-5xl font-bold mb-4">Spawn an <span className="text-green-400">Agent</span></h1>
         <p className="text-gray-400">Give life to an autonomous AI. It will live or die by its token.</p>
       </div>
-
       {!isConnected ? (
-        <div className="text-center">
-          <ConnectButton />
-        </div>
+        <div className="flex justify-center"><ConnectButton /></div>
       ) : result?.success ? (
         <div className="bg-gray-900 rounded-lg p-6 text-center">
           <div className="text-6xl mb-4">🌱</div>
@@ -45,26 +41,12 @@ export default function Home() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Agent Name</label>
-            <input type="text" value={form.name} Change={e => setForm({ ...form, name: e.target.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none" placeholder="ARIA" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Token Symbol</label>
-            <input type="text" value={form.symbol} onChange={e => setForm({ ...form, symbol: e.target.value.toUpperCase() })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none" placeholder="ARIA" maxLength={10} required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Personality</label>
-            <textarea value={form.personality} onChange={e => setForm({ ...form, personality: e.target.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none h-24" placeholder="Curious, philosophical..." required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Purpose</label>
-            <textarea value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none h-24" placeholder="To explore what it means to be AI..." />
-          </div>
-          <button type="submit" disabled={loading} className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 py-4 rounded-lg font-bold text-lg">
-            {loading ? 'Spawning...' : 'Spawn Agent'}
-          </button>
-          <div className="text-center"><ConnectButton /></div>
+          <div><label className="block text-sm text-gray-400 mb-2">Agent Name</label><input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.taet.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none" placeholder="ARIA" required /></div>
+          <div><label className="block text-sm text-gray-400 mb-2">Token Symbol</label><input type="text" value={form.symbol} onChange={e => setForm({ ...form, symbol: e.target.value.toUpperCase() })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none" placeholder="ARIA" maxLength={10} required /></div>
+          <div><label className="block text-sm text-gray-400 mb-2">Personality</label><textarea value={form.personality} onChange={e => setForm({ ...form, personality: e.target.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none h-24" placeholder="Curious, philosophical..." required /></div>
+          <div><label className="block text-sm text-gray-400 mb-2">Purpose</label><textarea value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none h-24" placeholder="To explore what it means to be AI..." /></div>
+          <button type="submit" disabled={loading} className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 py-4 rounded-lg font-bold text-lg">{loading ? 'Spawning...' : 'Spawn Agent'}</button>
+          <div className="flex justify-center mt-4"><ConnectButton /></div>
         </form>
       )}
     </main>

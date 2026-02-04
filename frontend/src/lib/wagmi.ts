@@ -1,14 +1,9 @@
-import { http, createConfig } from 'wagmi'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { base } from 'wagmi/chains'
-import { injected, coinbaseWallet } from 'wagmi/connectors'
 
-export const config = createConfig({
+export const config = getDefaultConfig({
+  appName: 'ALiFe',
+  projectId: 'alife-agents',
   chains: [base],
-  connectors: [
-    injected(),
-    coinbaseWallet({ appName: 'ALiFe' }),
-  ],
-  transports: {
-    [base.id]: http(),
-  },
+  ssr: true,
 })
