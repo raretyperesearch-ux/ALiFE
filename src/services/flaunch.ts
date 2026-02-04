@@ -17,7 +17,6 @@ interface FlaunchDeployResult {
   txHash: string
 }
 
-// Minimal PNG
 const PLACEHOLDER_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6QIEBwMwN5l6UAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAARklEQVR42u3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAN1+AABVhDU0QAAAABJRU5ErkJggg=='
 
 export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchDeployResult> => {
@@ -43,7 +42,6 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   const flaunch = createFlaunch({ publicClient, walletClient }) as any
 
-  // Try basic flaunchIPFS without split manager
   const hash = await flaunch.flaunchIPFS({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
@@ -59,12 +57,22 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
     creatorFeeAllocationPercent: 100,
   })
 
-  console.log(`Flaunch tx: ${hash}`)
+  console.log(`Flaunch tx submitted: ${hash}`)
 
-  const poolData = await flaunch.getPoolCreatedFromTx(hash)
+  // Wait for receipt with retries
+  let poolData = null
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 3000)) // wait 3 sec
+    try {
+      poolData = await flaunch.getPoolCreatedFromTx(hash)
+      if (poolData) break
+    } catch (e) {
+      console.log(`Waiting for receipt... attempt ${i + 1}`)
+    }
+  }
   
   if (!poolData) {
-    throw new Error('Failed to get token address from tx')
+    throw new Error(`Transaction submitted but receipt not found. Hash: ${hash}`)
   }
 
   console.log(`Token deployed: ${poolData.memecoin}`)
