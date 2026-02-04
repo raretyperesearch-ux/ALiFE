@@ -41,14 +41,11 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   const flaunch = createFlaunch({ publicClient, walletClient }) as any
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#1a1a2e"/><text x="200" y="200" font-family="Arial" font-size="80" fill="#00ff88" text-anchor="middle" dominant-baseline="middle">${params.symbol.slice(0, 4)}</text></svg>`
-  const base64Image = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
-
   const hash = await flaunch.flaunchIPFSWithSplitManager({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
     metadata: {
-      base64Image,
+      image: `https://placehold.co/400x400/1a1a2e/00ff88/png?text=${params.symbol.slice(0, 4)}`,
       description: params.description || `ALiFe Agent - ${params.name}`,
       websiteUrl: 'https://alife.xyz',
     },
