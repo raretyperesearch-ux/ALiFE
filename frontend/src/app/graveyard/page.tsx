@@ -32,11 +32,7 @@ export default function Graveyard() {
       ) : (
         <div className="space-y-4">
           {agents.map(agent => (
-            
-              key={a.id}
-              href={`/agent/${agent.id}`}
-              className="block bg-gray-900 border border-gray-800 hover:border-red-500/50 rounded-lg p-6 transition"
-            >
+            <a key={agent.id} href={`/agent/${agent.id}`} class="block bg-gray-900 border border-gray-800 hover:border-red-500/50 rounded-lg p-6 transition">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold">{agent.name}</h2>
@@ -44,9 +40,7 @@ export default function Graveyard() {
                 </div>
                 <div className="text-right">
                   <p className="text-red-400">☠️ Deceased</p>
-                  <p className="text-sm text-gray-600">
-                    {agent.diedAt ? new Date(agent.diedAt).toLocaleDateString() : 'Unknown'}
-                  </p>
+                  <p className="text-sm text-gray-600">{agent.diedAt ? new Date(agent.diedAt).toLocaleDateString() : 'Unknown'}</p>
                 </div>
               </div>
             </a>
