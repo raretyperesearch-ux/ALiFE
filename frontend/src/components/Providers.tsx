@@ -13,7 +13,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           accentColor: '#22c55e',
         },
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
         },
         defaultChain: base,
         supportedChains: [base],
