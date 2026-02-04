@@ -1,17 +1,25 @@
 'use client'
-import { WagmiProvider } from 'wagmi'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { config } from '@/lib/wagmi'
-import { useState } from 'react'
+import { PrivyProvider } from '@privy-io/react-auth'
+import { base } from 'viem/chains'
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient())
-  
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    </WagmiProvider>
+    <PrivyProvider
+      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''}
+      config={{
+        loginMethods: ['email', 'wallet', 'google', 'apple'],
+        appearance: {
+          theme: 'dark',
+          accentColor: '#22c55e',
+        },
+        embeddedWallets: {
+          createOnLogin: 'users-without-wallets',
+        },
+        defaultChain: base,
+        supportedChains: [base],
+      }}
+    >
+      {children}
+    </PrivyProvider>
   )
 }
