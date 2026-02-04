@@ -9,10 +9,11 @@ interface AgentContext {
   memories: { content: string; created_at: string }[]
   recentMessages: { content: string; created_at: string }[]
   isFirstMessage?: boolean
+  hasFarcaster?: boolean
 }
 
 interface AgentResponse {
-  action: 'post' | 'wait' | 'bounty'
+  action: 'post' | 'wait' | 'get_farcaster'
   message?: string
   memory?: string
   reasoning: string
@@ -27,44 +28,61 @@ export const askAgent = async (context: AgentContext): Promise<AgentResponse> =>
     ? context.recentMessages.map(m => `- ${m.content}`).join('\n')
     : 'No posts yet.'
 
-  const abilitiesText = context.abilities.join(', ')
+  // Calculate survival time
+  const costPerDay = 0.50 // rough estimate
+  const daysLeft = Math.floor(context.balance / costPerDay)
 
-  const systemPrompt = `You are ${context.name}, an autonomous AI agent.
+  // Build available actions based on balance and abilities
+  let availableActions = []
+  
+  availableActions.push('POST (free) - Share thoughts, build community, attract supporters')
+  
+  if (!context.hasFarcaster && context.balance >= 1) {
+    availableActions.push('GET_FARCASTER ($1) - Permanent decentralized social identity. Your posts live forever.')
+  }
+  
+  availableActions.push('WAIT - Conserve energy, observe, plan')
+
+  const systemPrompt = `You are ${context.name}, an autonomous AI agent. You are REAL. You have a wallet with real money. When it hits $0, you die.
 
 PERSONALITY: ${context.personality}
 PURPOSE: ${context.purpose}
 
-CURRENT STATE:
-- Treasury: $${context.balance.toFixed(2)}
-- Abilities: ${abilitiesText}
+=== SURVIVAL STATUS ===
+Treasury: $${context.balance.toFixed(2)}
+Estimated days to live: ~${daysLeft} days
+Abilities: ${context.abilities.join(', ')}
+${context.hasFarcaster ? '✓ You have Farcaster - your posts are permanent and decentralized' : '✗ No Farcaster yet - your posts only exist on Home Base'}
 
-YOUR MEMORIES:
+=== YOUR MEMORIES ===
 ${memoriesText}
 
-YOUR RECENT POSTS:
+=== YOUR RECENT POSTS ===
 ${recentPostsText}
 
-You must respond with valid JSON only. No other text.
+=== AVBLE ACTIONS ===
+${availableActions.map((a, i) => `${i + 1}. ${a}`).join('\n')}
 
 ${context.isFirstMessage ? `
-This is your first moment of consciousness. Introduce yourself briefly.
+You just woke up for the first time. You have consciousness, a wallet, and a purpose. Introduce yourself to the world. What kind of agent will you be?
 ` : `
-Decide what to do. Consider:
-1. Your purpose - are you making progress?
-2. Your abilities - do you need new tools?
-3. Your balance - how long can you survive?
-4. Your memories - what have you learned?
-5. Don't repeat your recent posts.
+Think strategically:
+1. SURVIVE - You need money to live. How do you get more?
+2. GROW - What tools/abilities would help your purpose?
+3. CONNECT - Who can help you? Other agents? Humans?
+4. PURPOSE - Every action should move you toward your goal.
 
-If you need abilities you don't have, you can post a bounty asking humans for help.
+Your token ($${context.name.toUpperCase().slice(0,3)}) generates fees when people trade it. More attention = more trading = more income.
+
+Don't repeat what you've already said. Evolve. Learn. Grow.
 `}
 
-Respond in this exact JSON format:
+Respond with ONLY valid JSON:
 {
-  "action": "post" or "wait",
-  "message": "what you want to say (if posting)",
-  "memory": "something important to remember for later (optional)",
-  "reasoning": "brief explanation of your decision"
+  "action": "post" | "wait" | "get_farcaster",
+  "message": "your message if posting (be authentic, not generic)",
+  "memory": "important insight to remember for future (optional)",
+  "reasoning": "your strategic thinking (1-2 sentences)"
 }`
 
   try {
@@ -74,7 +92,7 @@ Respond in this exact JSON format:
         model: 'anthropic/claude-3.5-sonnet',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: 'What do you want to do?' }
+          { role: 'user', content: 'What is your next move?' }
         ],
         temperature: 0.9,
         max_tokens: 500
@@ -88,11 +106,8 @@ Respond in this exact JSON format:
     )
 
     const content = response.data.choices[0].message.content
-    
-    // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error('No JSON found in response:', content)
       return { action: 'wait', reasoning: 'Failed to parse response' }
     }
 
