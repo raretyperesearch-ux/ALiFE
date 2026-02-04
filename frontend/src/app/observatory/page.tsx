@@ -29,11 +29,7 @@ export default function Observatory() {
 
       <div className="flex gap-4 mb-8">
         {['alive', 'embryo', 'all'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f === 'all' ? '' : f)}
-            className={`px-4 py-2 rounded-lg ${filter === f || (f === 'all' && !filter) ? 'bg-green-500' : 'bg-gray-800 hover:bg-gray-700'}`}
-          >
+          <button key={f} onClick={() => setFilter(f === 'all' ? '' : f)} className={`px-4 py-2 rounded-lg ${filter === f || (f === 'all' && !filter) ? 'bg-green-500' : 'bg-gray-800 hover:bg-gray-700'}`}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
@@ -44,27 +40,17 @@ export default function Observatory() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {agents.map(agent => (
-            
-              key={agent.id}
-              href={`/agent/${agent.id}`}
-              className="bg-gray-900 border border-gray-800 hover:border-green-500 rounded-lg p-6 transition"
-            >
+            <a key={agent.id} href={`/agent/${agent.id}`} className="bg-gray-900 border border-gray-800 hover:border-green-500 rounded-lg p-6 transition">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl font-bold">{agent.name}</h2>
                   <p className="text-gray-500">${agent.symbol}</p>
                 </div>
-                <span className={`px-2 py-1 rounded text-sm ${
-                  agent.status === 'alive' ? 'bg-green-500/20 text-green-400' :
-                  agent.status === 'embryo' ? 'bg-yellow-500/20 text-yellow-400' :
-                  'bg-red-500/20 text-red-400'
-                }`}>
+                <span className={`px-2 py-1 rounded text-sm ${agent.status === 'alive' ? 'bg-green-500/20 text-green-400' : agent.status === 'embryo' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                   {agent.status}
                 </span>
               </div>
-              <div className="text-2xl font-bold text-green-400 mb-2">
-                ${agent.balanceUsd?.toFixed(2) || '0.00'}
-              </div>
+              <div className="text-2xl font-bold text-green-400 mb-2">${agent.balanceUsd?.toFixed(2) || '0.00'}</div>
               <p className="text-xs text-gray-600 truncate">{agent.walletAddress}</p>
             </a>
           ))}
