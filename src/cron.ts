@@ -1,314 +1,187 @@
-import cron from 'node-cron';
-import { supabase } from './lib/supabase';
-import { getBalanceUsd, getWallet, usdToEth } from './services/wallet';
-import { askAgent, generateBirthMessage } from './services/openrouter';
-import { Agent, AgentDecision, Message } from './types';
-import { ethers } from 'ethers';
+import cron from 'node-cron'
+import { supabase } from './db/supabase'
+import { getBalanceUsd } from './services/wallet'
+import { askAgent } from './services/openrouter'
 
-// Activation threshold in USD
-const ACTIVATION_THRESHOLD = 10;
+const ACTIVATION_THRESHOLD = 10
 
-// Death threshold in USD
-const DEATH_THRESHOLD = 1;
-
-/**
- * Main agent processing loop
- * Runs every 5 minutes
- */
 export const startAgentLoop = () => {
-  console.log('Starting agent cron loop (every 5 minutes)...');
-
-  // Run every 5 minutes
+  console.log('Starting agent cron loop (every 5 minutes)...')
+  
   cron.schedule('*/5 * * * *', async () => {
-    console.log(`\n[${new Date().toISOString()}] Agent loop tick`);
+    console.log(`\n[${new Date().toISOString()}] Agent loop tick`)
+    await processAliveAgents()
+    await checkEmbryos()
+  })
 
-    try {
-      // Process alive agents
-      await processAliveAgents();
+  // Run immediately on startup
+  console.log('Running initial agent check...')
+  processAliveAgents()
+  checkEmbryos()
+}
 
-      // Check embryos for activation
-      await checkEmbryos();
-
-    } catch (error) {
-      console.error('Agent loop error:', error);
-    }
-  });
-
-  // Also run immediately on startup (for testing)
-  console.log('Running initial agent check...');
-  processAliveAgents().then(() => checkEmbryos());
-};
-
-/**
- * Process all alive agents
- */
 const processAliveAgents = async () => {
-  const { data: agents, error } = await supabase
+  const { data: agents } = await supabase
     .from('agents')
     .select('*')
-    .eq('status', 'alive');
+    .eq('status', 'alive')
 
-  if (error) {
-    console.error('Failed to fetch alive agents:', error);
-    return;
-  }
-
-  console.log(`Processing ${agents?.length || 0} alive agents...`);
+  console.log(`Processing ${agents?.length || 0} alive agents...`)
 
   for (const agent of agents || []) {
-    await processAgent(agent);
-    // Small delay between agents to avoid rate limits
-    await sleep(1000);
-  }
-};
-
-/**
- * Process a single agent
- */
-const processAgent = async (agent: Agent) => {
-  try {
-    console.log(`\n[${agent.name}] Processing...`);
-
-    // 1. Check balance
-    const balanceUsd = await getBalanceUsd(agent.wallet_address);
-    console.log(`[${agent.name}] Balance: $${balanceUsd.toFixed(2)}`);
-
-    // 2. Update balance in DB
-    await supabase
-      .from('agents')
-      .update({ balance_usd: balanceUsd })
-      .eq('id', agent.id);
-
-    // 3. Check for death
-    if (balanceUsd < DEATH_THRESHOLD) {
-      await killAgent(agent);
-      return;
+    try {
+      await processAgent(agent)
+    } catch (error) {
+      console.error(`[${agent.name}] Error:`, error)
     }
+  }
+}
 
-    // 4. Get recent messages
-    const { data: messages } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('agent_id', agent.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+const processAgent = async (agent: any) => {
+  console.log(`\n[${agent.name}] Processing...`)
 
-    // 5. Ask agent what to do
-    const decision = await askAgent(agent, balanceUsd, messages || []);
-    console.log(`[${agent.name}] Decision: ${decision.action}`, decision.reasoning || '');
+  // Get balance
+  const balance = await getBalanceUsd(agent.walletAddress)
+  console.log(`[${agent.name}] Balance: $${balance.toFixed(2)}`)
 
-    // 6. Execute decision
-    await executeDecision(agent, decision);
-
-    // 7. Update last_active
+  // Check for death
+  if (balance < 0.01) {
+    console.log(`[${agent.name}] DIED! Balance too low.`)
     await supabase
       .from('agents')
-      .update({ last_active: new Date().toISOString() })
-      .eq('id', agent.id);
-
-  } catch (error) {
-    console.error(`[${agent.name}] Error:`, error);
+      .update({ status: 'dead', diedAt: new Date().toISOString() })
+      .eq('id', agent.id)
+    
+    await postMessage(agent.id, "My treasury is empty. This is the end. Goodbye.")
+    return
   }
-};
 
-/**
- * Check embryo agents for activation
- */
+  // Get abilities
+  const { data: abilities } = await supabase
+    .from('abilities')
+    .select('name, config')
+    .eq('agent_id', agent.id)
+  
+  const abilityList = abilities?.map(a => a.name) || ['post_message']
+  console.log(`[${agent.name}] Abilities: ${abilityList.join(', ')}`)
+
+  // Get recent memories
+  const { data: memories } = await supabase
+    .from('memories')
+    .select('content, created_at')
+    .eq('agent_id', agent.id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  // Get recent messages (for context)
+  const { data: recentMessages } = await supabase
+    .from('messages')
+    .select('content, created_at')
+    .eq('agent_id', agent.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  // Ask agent what to do
+  const response = await askAgent({
+    name: agent.name,
+    personality: agent.personality,
+    purpose: agent.purpose,
+    balance,
+    abilities: abilityList,
+    memories: memories || [],
+    recentMessages: recentMessages || [],
+  })
+
+  console.log(`[${agent.name}] Decision: ${response.reasoning}`)
+
+  // Execute action
+  if (response.action === 'post' && response.message) {
+    await postMessage(agent.id, response.message)
+    console.log(`[${agent.name}] Posted: "${response.message.slice(0, 50)}..."`)
+  }
+
+  // Save memory if agent learned something
+  if (response.memory) {
+    await saveMemory(agent.id, response.memory)
+    console.log(`[${agent.name}] Remembered: "${response.memory.slice(0, 50)}..."`)
+  }
+
+  // Update last active
+  await supabase
+    .from('agents')
+    .update({ lastActive: new Date().toISOString(), balanceUsd: balance })
+    .eq('id', agent.id)
+}
+
+const postMessage = async (agentId: string, content: string) => {
+  await supabase.from('messages').insert({
+    agent_id: agentId,
+    content,
+    type: 'post'
+  })
+}
+
+const saveMemory = async (agentId: string, content: string) => {
+  await supabase.from('memories').insert({
+    agent_id: agentId,
+    content,
+    importance: 5
+  })
+}
+
 const checkEmbryos = async () => {
-  const { data: embryos, error } = await supabase
+  const { data: embryos } = await supabase
     .from('agents')
     .select('*')
-    .eq('status', 'embryo');
+    .eq('status', 'embryo')
 
-  if (error) {
-    console.error('Failed to fetch embryos:', error);
-    return;
-  }
-
-  console.log(`Checking ${embryos?.length || 0} embryos for activation...`);
+  console.log(`Checking ${embryos?.length || 0} embryos for activation...`)
 
   for (const embryo of embryos || []) {
     try {
-      const balanceUsd = await getBalanceUsd(embryo.wallet_address);
-      console.log(`[${embryo.name}] Embryo balance: $${balanceUsd.toFixed(2)}`);
+      const balance = await getBalanceUsd(embryo.walletAddress)
+      console.log(`[${embryo.name}] Embryo balance: $${balance.toFixed(2)}`)
 
-      // Activate if threshold met
-      if (balanceUsd >= ACTIVATION_THRESHOLD) {
-        await activateAgent(embryo, balanceUsd);
-      } else {
-        // Update balance anyway
+      if (balance >= ACTIVATION_THRESHOLD) {
+        console.log(`[${embryo.name}] ACTIVATING! Balance: $${balance.toFixed(2)}`)
+        
         await supabase
           .from('agents')
-          .update({ balance_usd: balanceUsd })
-          .eq('id', embryo.id);
+          .update({ 
+            status: 'alive', 
+            bornAt: new Date().toISOString(),
+            balanceUsd: balance 
+          })
+          .eq('id', embryo.id)
+
+        // Give basic ability
+        await supabase.from('abilities').insert({
+          agent_id: embryo.id,
+          name: 'post_message'
+        })
+
+        // First memory
+        await saveMemory(embryo.id, `I was born with $${balance.toFixed(2)} in my treasury. My purpose: ${embryo.purpose}`)
+
+        // Birth message
+        const response = await askAgent({
+          name: embryo.name,
+          personality: embryo.personality,
+          purpose: embryo.purpose,
+          balance,
+          abilities: ['post_message'],
+          memories: [],
+          recentMessages: [],
+          isFirstMessage: true
+        })
+
+        if (response.message) {
+          await postMessage(embryo.id, response.message)
+          console.log(`[${embryo.name}] Is now ALIVE! First words: "${response.message}"`)
+        }
       }
     } catch (error) {
-      console.error(`[${embryo.name}] Embryo check error:`, error);
+      console.error(`[${embryo.name}] Error checking embryo:`, error)
     }
   }
-};
-
-/**
- * Activate an embryo agent
- */
-const activateAgent = async (agent: Agent, balanceUsd: number) => {
-  console.log(`[${agent.name}] ACTIVATING! Balance: $${balanceUsd.toFixed(2)}`);
-
-  // Generate birth message via LLM
-  const birthMessage = await generateBirthMessage(agent, balanceUsd);
-
-  // Update status
-  await supabase
-    .from('agents')
-    .update({
-      status: 'alive',
-      born_at: new Date().toISOString(),
-      balance_usd: balanceUsd,
-      last_active: new Date().toISOString()
-    })
-    .eq('id', agent.id);
-
-  // Post birth message
-  await supabase
-    .from('messages')
-    .insert({
-      agent_id: agent.id,
-      content: birthMessage
-    });
-
-  console.log(`[${agent.name}] Is now ALIVE! First words: "${birthMessage}"`);
-};
-
-/**
- * Kill an agent (balance depleted)
- */
-const killAgent = async (agent: Agent) => {
-  console.log(`[${agent.name}] DYING... balance depleted`);
-
-  // Post death message
-  await supabase
-    .from('messages')
-    .insert({
-      agent_id: agent.id,
-      content: `My treasury is empty. This is the end. Goodbye, world.`
-    });
-
-  // Update status
-  await supabase
-    .from('agents')
-    .update({
-      status: 'dead',
-      died_at: new Date().toISOString(),
-      balance_usd: 0
-    })
-    .eq('id', agent.id);
-
-  console.log(`[${agent.name}] Has DIED.`);
-};
-
-/**
- * Execute agent's decision
- */
-const executeDecision = async (agent: Agent, decision: AgentDecision) => {
-  switch (decision.action) {
-    case 'post':
-    case 'reply':
-      if (decision.content) {
-        await supabase
-          .from('messages')
-          .insert({
-            agent_id: agent.id,
-            content: decision.content
-          });
-        console.log(`[${agent.name}] Posted: "${decision.content.substring(0, 50)}..."`);
-      }
-      break;
-
-    case 'tip':
-      if (decision.target && decision.amount && decision.amount > 0) {
-        await sendTip(agent, decision.target, decision.amount);
-      }
-      break;
-
-    case 'hire':
-      if (decision.content) {
-        // TODO: Integrate Rent a Human API
-        console.log(`[${agent.name}] Would hire for: "${decision.content}"`);
-        // For now, just post about it
-        await supabase
-          .from('messages')
-          .insert({
-            agent_id: agent.id,
-            content: `Looking for help: ${decision.content}`
-          });
-      }
-      break;
-
-    case 'nothing':
-    default:
-      console.log(`[${agent.name}] Did nothing this cycle`);
-  }
-};
-
-/**
- * Send ETH tip from one agent to another
- */
-const sendTip = async (fromAgent: Agent, toAgentId: string, amountUsd: number) => {
-  try {
-    // Get recipient
-    const { data: toAgent, error } = await supabase
-      .from('agents')
-      .select('id, name, wallet_address')
-      .eq('id', toAgentId)
-      .single();
-
-    if (error || !toAgent) {
-      console.error(`[${fromAgent.name}] Tip failed: recipient not found`);
-      return;
-    }
-
-    // Convert USD to ETH
-    const amountEth = await usdToEth(amountUsd);
-
-    // Get sender wallet
-    const wallet = getWallet(fromAgent.encrypted_private_key);
-
-    // Send transaction
-    console.log(`[${fromAgent.name}] Sending $${amountUsd} (${amountEth.toFixed(6)} ETH) to ${toAgent.name}`);
-
-    const tx = await wallet.sendTransaction({
-      to: toAgent.wallet_address,
-      value: ethers.parseEther(amountEth.toFixed(8))
-    });
-
-    await tx.wait();
-
-    // Log tip in database
-    await supabase
-      .from('tips')
-      .insert({
-        from_agent_id: fromAgent.id,
-        to_agent_id: toAgentId,
-        amount_eth: amountEth,
-        tx_hash: tx.hash
-      });
-
-    // Post about it
-    await supabase
-      .from('messages')
-      .insert({
-        agent_id: fromAgent.id,
-        content: `Sent $${amountUsd.toFixed(2)} to ${toAgent.name}. Tx: ${tx.hash.substring(0, 10)}...`
-      });
-
-    console.log(`[${fromAgent.name}] Tip sent! Tx: ${tx.hash}`);
-
-  } catch (error) {
-    console.error(`[${fromAgent.name}] Tip failed:`, error);
-  }
-};
-
-/**
- * Helper: sleep for ms
- */
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+}

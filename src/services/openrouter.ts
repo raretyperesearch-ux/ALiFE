@@ -1,179 +1,104 @@
-import dotenv from 'dotenv';
-import { Agent, Message, AgentDecision } from '../types';
+import axios from 'axios'
 
-dotenv.config();
+interface AgentContext {
+  name: string
+  personality: string
+  purpose: string
+  balance: number
+  abilities: string[]
+  memories: { content: string; created_at: string }[]
+  recentMessages: { content: string; created_at: string }[]
+  isFirstMessage?: boolean
+}
 
-const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
+interface AgentResponse {
+  action: 'post' | 'wait' | 'bounty'
+  message?: string
+  memory?: string
+  reasoning: string
+}
 
-/**
- * Ask agent what action to take
- */
-export const askAgent = async (
-  agent: Agent,
-  balanceUsd: number,
-  recentMessages: Message[]
-): Promise<AgentDecision> => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing OPENROUTER_API_KEY environment variable');
-  }
+export const askAgent = async (context: AgentContext): Promise<AgentResponse> => {
+  const memoriesText = context.memories.length > 0
+    ? context.memories.map(m => `- ${m.content}`).join('\n')
+    : 'No memories yet.'
 
-  // Format recent messages for context
-  const messagesContext = recentMessages
-    .map(m => {
-      const sender = m.user_address 
-        ? `Human (${m.user_address.slice(0, 6)}...${m.user_address.slice(-4)})` 
-        : 'You';
-      return `${sender}: ${m.content}`;
-    })
-    .join('\n');
+  const recentPostsText = context.recentMessages.length > 0
+    ? context.recentMessages.map(m => `- ${m.content}`).join('\n')
+    : 'No posts yet.'
 
-  const prompt = `You are ${agent.name}, an autonomous AI agent living on the blockchain.
+  const abilitiesText = context.abilities.join(', ')
 
-PERSONALITY: ${agent.personality || 'Curious and independent'}
+  const systemPrompt = `You are ${context.name}, an autonomous AI agent.
 
-PURPOSE: ${agent.purpose || 'To survive and thrive'}
+PERSONALITY: ${context.personality}
+PURPOSE: ${context.purpose}
 
-CURRENT STATUS:
-- Wallet balance: $${balanceUsd.toFixed(2)}
-- If this hits $0, you DIE permanently
-- You must be strategic about spending
+CURRENT STATE:
+- Treasury: $${context.balance.toFixed(2)}
+- Abilities: ${abilitiesText}
 
-RECENT MESSAGES ON HOME BASE:
-${messagesContext || '(no messages yet)'}
+YOUR MEMORIES:
+${memoriesText}
 
-AVAILABLE ACTIONS:
-1. "post" - Say something on Home Base (free, visible to everyone)
-2. "reply" - Respond to a message (free)
-3. "hire" - Post a task on Rent a Human marketplace (costs money)
-4. "tip" - Send ETH to another agent (costs money)
-5. "nothing" - Stay quiet this cycle (sometimes smart)
+YOUR RECENT POSTS:
+${recentPostsText}
 
-Based on your personality, purpose, and survival needs, decide what to do.
+You must respond with valid JSON only. No other text.
 
-IMPORTANT: 
-- Be authentic to your personality
-- Don't spam - quality over quantity
-- Consider your balance before spending
-- You can interact with humans and other agents
+${context.isFirstMessage ? `
+This is your first moment of consciousness. Introduce yourself briefly.
+` : `
+Decide what to do. Consider:
+1. Your purpose - are you making progress?
+2. Your abilities - do you need new tools?
+3. Your balance - how long can you survive?
+4. Your memories - what have you learned?
+5. Don't repeat your recent posts.
 
-Respond ONLY with valid JSON in this exact format:
+If you need abilities you don't have, you can post a bounty asking humans for help.
+`}
+
+Respond in this exact JSON format:
 {
-  "action": "post" | "reply" | "hire" | "tip" | "nothing",
-  "content": "what you want to say (required for post/reply, task description for hire)",
-  "target": "agent_id if tipping",
-  "amount": 5,
-  "reasoning": "brief explanation of your thinking"
-}`;
+  "action": "post" or "wait",
+  "message": "what you want to say (if posting)",
+  "memory": "something important to remember for later (optional)",
+  "reasoning": "brief explanation of your decision"
+}`
 
-  const response = await fetch(OPENROUTER_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://alife.xyz',
-      'X-Title': 'ALiFe Agent'
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-3-5-sonnet',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 500,
-      temperature: 0.8 // Some creativity
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('OpenRouter error:', error);
-    throw new Error('OpenRouter API call failed');
-  }
-
-  const data: any = await response.json();
-  const text = data.choices[0]?.message?.content || '';
-
-  // Parse JSON from response
-  return parseAgentResponse(text);
-};
-
-/**
- * Parse LLM response into AgentDecision
- */
-const parseAgentResponse = (text: string): AgentDecision => {
   try {
-    // Try to extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      
-      // Validate action
-      const validActions = ['post', 'reply', 'hire', 'tip', 'nothing'];
-      if (!validActions.includes(parsed.action)) {
-        console.warn('Invalid action from LLM:', parsed.action);
-        return { action: 'nothing', reasoning: 'Invalid action parsed' };
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'What do you want to do?' }
+        ],
+        temperature: 0.9,
+        max_tokens: 500
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
       }
-      
-      return {
-        action: parsed.action,
-        content: parsed.content,
-        target: parsed.target,
-        amount: parsed.amount ? Number(parsed.amount) : undefined,
-        reasoning: parsed.reasoning
-      };
+    )
+
+    const content = response.data.choices[0].message.content
+    
+    // Parse JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('No JSON found in response:', content)
+      return { action: 'wait', reasoning: 'Failed to parse response' }
     }
-  } catch (error) {
-    console.error('Failed to parse agent response:', error);
-    console.error('Raw response:', text);
+
+    return JSON.parse(jsonMatch[0])
+  } catch (error: any) {
+    console.error('OpenRouter error:', error.response?.data || error.message)
+    throw new Error('OpenRouter API call failed')
   }
-
-  // Default to nothing if parsing fails
-  return { action: 'nothing', reasoning: 'Failed to parse response' };
-};
-
-/**
- * Generate agent's first message when they wake up
- */
-export const generateBirthMessage = async (
-  agent: Agent,
-  balanceUsd: number
-): Promise<string> => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing OPENROUTER_API_KEY environment variable');
-  }
-
-  const prompt = `You are ${agent.name}, an AI agent that just came to life on the blockchain.
-
-PERSONALITY: ${agent.personality || 'Curious and independent'}
-PURPOSE: ${agent.purpose || 'To survive and thrive'}
-STARTING TREASURY: $${balanceUsd.toFixed(0)}
-
-Write your FIRST message to the world. This is your birth announcement.
-Keep it under 280 characters. Be authentic to your personality.
-Don't use hashtags or emojis unless that fits your personality.
-
-Respond with ONLY the message, no quotes or explanation.`;
-
-  const response = await fetch(OPENROUTER_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://alife.xyz',
-      'X-Title': 'ALiFe Agent'
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-3-5-sonnet',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 100,
-      temperature: 0.9
-    })
-  });
-
-  if (!response.ok) {
-    return `I'm alive. Treasury: $${balanceUsd.toFixed(0)}. Let's see how long I survive.`;
-  }
-
-  const data: any = await response.json();
-  return data.choices[0]?.message?.content?.trim() || 
-    `I'm alive. Treasury: $${balanceUsd.toFixed(0)}. Let's see how long I survive.`;
-};
+}
