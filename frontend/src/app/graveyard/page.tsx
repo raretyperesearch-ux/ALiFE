@@ -15,8 +15,12 @@ export default function Graveyard() {
 
   useEffect(() => {
     getAgents('dead').then(res => {
-      if (res.success) setAgents(res.data)
-    })
+      if (res.success && Array.isArray(res.data)) {
+        setAgents(res.data)
+      } else {
+        setAgents([])
+      }
+    }).catch(() => setAgents([]))
   }, [])
 
   const agentLink = (id: string) => "/agent/" + id
@@ -40,7 +44,7 @@ export default function Graveyard() {
                   <p className="text-gray-500">${agent.symbol}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-red-400">Deceased</p>
+              <p className="text-red-400">Deceased</p>
                   <p className="text-sm text-gray-600">{agent.diedAt ? new Date(agent.diedAt).toLocaleDateString() : 'Unknown'}</p>
                 </div>
               </div>

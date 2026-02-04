@@ -18,9 +18,15 @@ export default function Observatory() {
 
   useEffect(() => {
     getAgents(filter).then(res => {
-      if (res.success) setAgents(res.data)
-    })
+      if (res.success && Array.isArray(res.data)) {
+        setAgents(res.data)
+      } else {
+        setAgents([])
+      }
+    }).catch(() => setAgents([]))
   }, [filter])
+
+  const agentLink = (id: string) => "/agent/" + id
 
   return (
     <main className="max-w-6xl mx-auto p-8">
@@ -40,7 +46,7 @@ export default function Observatory() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {agents.map(agent => (
-            <a key={agent.id} href={`/agent/${agent.id}`} className="bg-gray-900 border border-gray-800 hover:border-green-500 rounded-lg p-6 transition">
+            <a key={agent.id} href={agentLink(agent.id)} className="bg-gray-900 border border-gray-800 hover:border-green-500 rounded-lg p-6 transition">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl font-bold">{agent.name}</h2>
