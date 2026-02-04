@@ -25,9 +25,6 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   console.log(`Deploying token ${params.symbol} via Flaunch...`)
   console.log(`Fee split: 50% platform, 25% dev, 25% agent`)
-  console.log(`Platform: ${params.platformWallet}`)
-  console.log(`Dev: ${params.devWallet}`)
-  console.log(`Agent: ${params.agentWallet}`)
 
   const account = privateKeyToAccount(privateKey)
 
@@ -44,11 +41,21 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   const flaunch = createFlaunch({ publicClient, walletClient }) as any
 
-  // Use basic flaunch first to see what it needs
-  const hash = await flaunch.flaunch({
+  const hash = await flaunch.flaunchWithSplitManager({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
+    tokenUri: '',
+    fairLaunchPercent: 0,
+    fairLaunchDuration: 1800,
+    initialMarketCapUSD: 5000,
     creator: params.platformWallet as `0x${string}`,
+    creatorFeeAllocationPercent: 100,
+    creatorSplitPercent: 50,
+    managerOwnerSplitPercent: 0,
+    splitReceivers: [
+      { address: params.devWallet as `0x${string}`, percent: 25 },
+      { address: params.agentWallet as `0x${string}`, percent: 25 },
+    ],
   })
 
   console.log(`Flaunch tx: ${hash}`)
