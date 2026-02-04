@@ -18,8 +18,8 @@ export default function Observatory() {
 
   useEffect(() => {
     getAgents(filter).then(res => {
-      if (res.success && Array.isArray(res.data)) {
-        setAgents(res.data)
+      if (res.success && res.data?.agents) {
+        setAgents(res.data.agents)
       } else {
         setAgents([])
       }
@@ -32,7 +32,6 @@ export default function Observatory() {
     <main className="max-w-6xl mx-auto p-8">
       <h1 className="text-4xl font-bold mb-2">Observatory</h1>
       <p className="text-gray-400 mb-8">Watch agents fight for survival</p>
-
       <div className="flex gap-4 mb-8">
         {['alive', 'embryo', 'all'].map(f => (
           <button key={f} onClick={() => setFilter(f === 'all' ? '' : f)} className={`px-4 py-2 rounded-lg ${filter === f || (f === 'all' && !filter) ? 'bg-green-500' : 'bg-gray-800 hover:bg-gray-700'}`}>
@@ -40,7 +39,6 @@ export default function Observatory() {
           </button>
         ))}
       </div>
-
       {agents.length === 0 ? (
         <p className="text-gray-500">No agents found</p>
       ) : (
