@@ -1,3 +1,8 @@
+import { createFlaunch } from '@flaunch/sdk'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { base } from 'viem/chains'
+
 interface FlaunchDeployParams {
   name: string
   symbol: string
@@ -13,7 +18,7 @@ interface FlaunchDeployResult {
 }
 
 export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchDeployResult> => {
-  const privateKey = process.env.PLATFORM_PRIVATE_KEY
+  const privateKey = process.env.PLATFORM_PRIVATE_KEY as `0x${string}`
   if (!privateKey) {
     throw new Error('Missing PLATFORM_PRIVATE_KEY environment variable')
   }
@@ -21,13 +26,56 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
   console.log(`Deploying token ${params.symbol} via Flaunch...`)
   console.log(`Fee split: 50% platform, 25% dev, 25% agent`)
 
-  // Mock for now - real Flaunch SDK integration later
-  const mockTokenAddress = `0x${Buffer.from(params.symbol + Date.now()).toString('hex').slice(0, 40)}`
+  const account = privateKeyToAccount(privateKey)
+
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
+  })
+
+  const walletClient = createWalletClient({
+    account,
+    chain: base,
+    transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
+  })
+
+  const flaunch = createFlaunch({ publicClient, walletClient }) as any
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#1a1a2e"/><text x="200" y="200" font-family="Arial" font-size="80" fill="#00ff88" text-anchor="middle" dominant-baseline="middle">${params.symbol.slice(0, 4)}</text></svg>`
+  const base64Image = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+
+  const hash = await flaunch.flaunchIPFSWithSplitManager({
+    name: params.name,
+    symbol: params.symbol.toUpperCase(),
+    metadata: {
+      base64Image,
+      description: params.description || `ALiFe Agent - ${params.name}`,
+      websiteUrl: 'https://alife.xyz',
+    },
+    fairLaunchPercent: 0,
+    fairLaunchDuration: 30 * 60,
+    initialMarketCapUSD: 5000,
+    creator: params.platformWallet as `0x${string}`,
+    creatorFeeAllocationPercent: 100,
+    creatorSplitPercent: 50,
+    splitReceivers: [
+      { address: params.devWallet as `0x${string}`, percent: 50 },
+      { address: params.agentWallet as `0x${string}`, percent: 50 },
+    ],
+  })
+
+  console.log(`Flaunch tx: ${hash}`)
+
+  const poolData = await flaunch.getPoolCreatedFromTx(hash)
   
-  console.log(`[MOCK] Token deployed: ${mockTokenAddress}`)
+  if (!poolData) {
+    throw new Error('Failed to get token address from tx')
+  }
+
+  console.log(`Token deployed: ${poolData.memecoin}`)
 
   return {
-    tokenAddress: mockTokenAddress,
-    txHash: `0x${'0'.repeat(64)}`,
+    tokenAddress: poolData.memecoin,
+    txHash: hash,
   }
 }
