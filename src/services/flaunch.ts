@@ -17,7 +17,7 @@ interface FlaunchDeployResult {
   txHash: string
 }
 
-// Minimal 100x100 green PNG
+// Minimal PNG
 const PLACEHOLDER_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6QIEBwMwN5l6UAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAARklEQVR42u3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAN1+AABVhDU0QAAAABJRU5ErkJggg=='
 
 export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchDeployResult> => {
@@ -27,7 +27,6 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
   }
 
   console.log(`Deploying token ${params.symbol} via Flaunch...`)
-  console.log(`Fee split: 50% platform, 25% dev, 25% agent`)
 
   const account = privateKeyToAccount(privateKey)
 
@@ -44,8 +43,8 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
 
   const flaunch = createFlaunch({ publicClient, walletClient }) as any
 
-  // Use SDK's built-in IPFS upload
-  const hash = await flaunch.flaunchIPFSWithSplitManager({
+  // Try basic flaunchIPFS without split manager
+  const hash = await flaunch.flaunchIPFS({
     name: params.name,
     symbol: params.symbol.toUpperCase(),
     metadata: {
@@ -55,15 +54,9 @@ export const deployToken = async (params: FlaunchDeployParams): Promise<FlaunchD
     },
     fairLaunchPercent: 0,
     fairLaunchDuration: 30 * 60,
-    initialMarketCapUSD: 10000,
+    initialMarketCapUSD: 5000,
     creator: params.platformWallet as `0x${string}`,
     creatorFeeAllocationPercent: 100,
-    creatorSplitPercent: 50,
-    managerOwnerSplitPercent: 0,
-    splitReceivers: [
-      { address: params.devWallet as `0x${string}`, percent: 25 },
-      { address: params.agentWallet as `0x${string}`, percent: 25 },
-    ],
   })
 
   console.log(`Flaunch tx: ${hash}`)
