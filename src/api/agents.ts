@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
-import { deployToken } from '../services/clanker';
+import { deployToken } from '../services/flaunch';
 import { generateWallet, getBalanceUsd } from '../services/wallet';
 import { CreateAgentRequest, Agent, AgentPublic } from '../types';
 
