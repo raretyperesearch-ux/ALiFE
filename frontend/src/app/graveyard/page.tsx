@@ -33,8 +33,8 @@ export default function Graveyard() {
         <div className="space-y-4">
           {agents.map(agent => (
             
-              key={agent.id}
-          href={`/agent/${agent.id}`}
+              key={a.id}
+              href={`/agent/${agent.id}`}
               className="block bg-gray-900 border border-gray-800 hover:border-red-500/50 rounded-lg p-6 transition"
             >
               <div className="flex justify-between items-center">
