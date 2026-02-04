@@ -4,7 +4,8 @@ import { getAgents } from '@/lib/api'
 
 interface Agent {
   id: string
-  name: str  symbol: string
+  name: string
+  symbol: string
   status: string
   balanceUsd: number
   walletAddress: string
